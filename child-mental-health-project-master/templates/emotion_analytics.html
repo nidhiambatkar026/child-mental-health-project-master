@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Emotion Analytics Dashboard</h2>
+    
+    <!-- Overall Video Statistics -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Overall Video Emotion Analysis</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Video Title</th>
+                                    <th>Happy</th>
+                                    <th>Sad</th>
+                                    <th>Angry</th>
+                                    <th>Surprised</th>
+                                    <th>Neutral</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for video, happy, sad, angry, surprised, neutral in video_emotions %}
+                                <tr>
+                                    <td>{{ video.title }}</td>
+                                    <td>{{ "%.1f"|format(happy * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(sad * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(angry * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(surprised * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(neutral * 100) }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Warning Status -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>User Warning Status</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Warning Level</th>
+                                    <th>Last Warning</th>
+                                    <th>Status</th>
+                                    <th>Recommended Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% set processed_users = [] %}
+                                {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                                    {% if user.id not in processed_users %}
+                                        {% set _ = processed_users.append(user.id) %}
+                                        <tr>
+                                            <td>{{ user.username }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if user.warning_level == 0 else 'warning' if user.warning_level < 3 else 'danger' }}">
+                                                    Level {{ user.warning_level }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if user.last_warning_date %}
+                                                    {{ user.last_warning_date.strftime('%Y-%m-%d %H:%M:%S') }}
+                                                {% else %}
+                                                    No warnings
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if user.warning_level >= 3 %}
+                                                    <span class="badge bg-danger">Critical</span>
+                                                {% elif user.warning_level > 0 %}
+                                                    <span class="badge bg-warning">Warning</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Good</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if user.warning_level >= 3 %}
+                                                    <strong class="text-danger">Recommend immediate break from viewing</strong>
+                                                {% elif user.warning_level > 0 %}
+                                                    <span class="text-warning">Consider taking a short break</span>
+                                                {% else %}
+                                                    <span class="text-success">No action needed</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User-Specific Emotion Analysis -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>User-Specific Emotion Analysis</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Video</th>
+                                    <th>Happy</th>
+                                    <th>Sad</th>
+                                    <th>Angry</th>
+                                    <th>Surprised</th>
+                                    <th>Neutral</th>
+                                    <th>Total Reactions</th>
+                                    <th>Dominant Emotion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ video.title }}</td>
+                                    <td>{{ "%.1f"|format(happy * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(sad * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(angry * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(surprised * 100) }}%</td>
+                                    <td>{{ "%.1f"|format(neutral * 100) }}%</td>
+                                    <td>{{ reactions }}</td>
+                                    <td>
+                                        {% set emotions = {
+                                            'Happy': happy,
+                                            'Sad': sad,
+                                            'Angry': angry,
+                                            'Surprised': surprised,
+                                            'Neutral': neutral
+                                        } %}
+                                        {% set dominant = emotions|dictsort(by='value')|reverse|first %}
+                                        <span class="badge 
+                                            {% if dominant[0] == 'Happy' %}bg-success
+                                            {% elif dominant[0] == 'Sad' %}bg-info
+                                            {% elif dominant[0] == 'Angry' %}bg-danger
+                                            {% elif dominant[0] == 'Surprised' %}bg-warning
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ dominant[0] }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add some charts -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Emotion Trends</h4>
+                </div>
+                <div class="card-body">
+                    <canvas id="emotionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('emotionChart').getContext('2d');
+        
+        // Create arrays to store the data
+        const videoTitles = [
+            {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                "{{ video.title }}",
+            {% endfor %}
+        ];
+        
+        const happyData = [
+            {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                {{ happy * 100 }},
+            {% endfor %}
+        ];
+        
+        const sadData = [
+            {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                {{ sad * 100 }},
+            {% endfor %}
+        ];
+        
+        const angryData = [
+            {% for user, video, happy, sad, angry, surprised, neutral, reactions in user_emotions %}
+                {{ angry * 100 }},
+            {% endfor %}
+        ];
+
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: videoTitles,
+                datasets: [{
+                    label: 'Happy',
+                    data: happyData,
+                    backgroundColor: 'rgba(75, 192, 192, 0.5)'
+                }, {
+                    label: 'Sad',
+                    data: sadData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                }, {
+                    label: 'Angry',
+                    data: angryData,
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Emotion Percentage'
+                        }
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %} 

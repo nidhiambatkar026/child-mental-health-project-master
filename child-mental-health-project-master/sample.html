@@ -1,0 +1,252 @@
+<!-- templates/reels.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reels Page</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        .reels-container {
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            background-color: black;
+        }
+
+        .reel {
+            height: 100vh;
+            width: 100%;
+            scroll-snap-align: start;
+            position: relative;
+            background-color: #000;
+        }
+
+        .reel video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .reel-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+            color: white;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #666;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .actions {
+            position: absolute;
+            right: 20px;
+            bottom: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .action-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+
+        .action-button i {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .count {
+            font-size: 14px;
+        }
+
+        .liked {
+            color: red;
+        }
+    </style>
+    <!-- You'll need to include an icon library like FontAwesome in your project -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="reels-container" id="reelsContainer">
+        <!-- Reels will be inserted here -->
+    </div>
+
+    <script>
+        // Sample data - in a real app, this would come from your Flask backend
+        const reelsData = [
+            {
+                id: 1,
+                videoUrl: '/static/videos/reel1.mp4',
+                username: '@user1',
+                description: 'First awesome reel! #fun #trending',
+                likes: 1234,
+                comments: 88,
+                shares: 45
+            },
+            {
+                id: 2,
+                videoUrl: '/static/videos/reel2.mp4',
+                username: '@user2',
+                description: 'Check out this cool effect! #creative',
+                likes: 2341,
+                comments: 156,
+                shares: 89
+            }
+        ];
+
+        class ReelsPlayer {
+            constructor(container, data) {
+                this.container = container;
+                this.reels = data;
+                this.currentReelIndex = 0;
+                this.init();
+            }
+
+            init() {
+                this.renderReels();
+                this.setupIntersectionObserver();
+                this.setupScrollHandler();
+            }
+
+            renderReels() {
+                this.reels.forEach(reel => {
+                    const reelElement = this.createReelElement(reel);
+                    this.container.appendChild(reelElement);
+                });
+            }
+
+            createReelElement(reel) {
+                const reelDiv = document.createElement('div');
+                reelDiv.className = 'reel';
+                reelDiv.innerHTML = `
+                    <video src="${reel.videoUrl}" loop>
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="reel-overlay">
+                        <div class="user-info">
+                            <div class="user-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="username">${reel.username}</div>
+                        </div>
+                        <div class="description">${reel.description}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="action-button like-button" data-reel-id="${reel.id}">
+                            <i class="fas fa-heart"></i>
+                            <span class="count">${reel.likes}</span>
+                        </button>
+                        <button class="action-button">
+                            <i class="fas fa-comment"></i>
+                            <span class="count">${reel.comments}</span>
+                        </button>
+                        <button class="action-button">
+                            <i class="fas fa-share"></i>
+                            <span class="count">${reel.shares}</span>
+                        </button>
+                    </div>
+                `;
+
+                // Setup video element
+                const video = reelDiv.querySelector('video');
+                video.addEventListener('click', () => {
+                    if (video.paused) {
+                        video.play();
+                    } else {
+                        video.pause();
+                    }
+                });
+
+                // Setup like button
+                const likeButton = reelDiv.querySelector('.like-button');
+                likeButton.addEventListener('click', () => {
+                    likeButton.classList.toggle('liked');
+                    const countSpan = likeButton.querySelector('.count');
+                    let currentLikes = parseInt(countSpan.textContent);
+                    if (likeButton.classList.contains('liked')) {
+                        countSpan.textContent = currentLikes + 1;
+                    } else {
+                        countSpan.textContent = currentLikes - 1;
+                    }
+                });
+
+                return reelDiv;
+            }
+
+            setupIntersectionObserver() {
+                const options = {
+                    root: this.container,
+                    threshold: 0.5
+                };
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        const video = entry.target.querySelector('video');
+                        if (entry.isIntersecting) {
+                            video.play();
+                        } else {
+                            video.pause();
+                        }
+                    });
+                }, options);
+
+                // Observe all reel elements
+                this.container.querySelectorAll('.reel').forEach(reel => {
+                    observer.observe(reel);
+                });
+            }
+
+            setupScrollHandler() {
+                let scrollTimeout;
+                this.container.addEventListener('scroll', () => {
+                    clearTimeout(scrollTimeout);
+                    scrollTimeout = setTimeout(() => {
+                        const reelHeight = this.container.clientHeight;
+                        const scrollPosition = this.container.scrollTop;
+                        this.currentReelIndex = Math.round(scrollPosition / reelHeight);
+                    }, 50);
+                });
+            }
+        }
+
+        // Initialize the reels player
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('reelsContainer');
+            const reelsPlayer = new ReelsPlayer(container, reelsData);
+        });
+    </script>
+</body>
+</html>

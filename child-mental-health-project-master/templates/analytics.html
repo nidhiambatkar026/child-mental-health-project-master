@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Video Analytics Dashboard</h2>
+    
+    <!-- Overall Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Views</h5>
+                    <h2 class="card-text">{{ total_views }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Completed Views</h5>
+                    <h2 class="card-text">{{ total_completed }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Video Statistics -->
+    <h3>Video Statistics</h3>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Video Title</th>
+                    <th>Views</th>
+                    <th>Avg. Watch Duration</th>
+                    <th>Completion Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for video, views, avg_duration, completions in video_stats %}
+                <tr>
+                    <td>{{ video.title }}</td>
+                    <td>{{ views }}</td>
+                    <td>{{ "%.2f"|format(avg_duration or 0) }}s</td>
+                    <td>{{ "%.1f"|format(completions/views * 100 if views > 0 else 0) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- User Statistics -->
+    <h3>User Statistics</h3>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Videos Watched</th>
+                    <th>Total Watch Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user, videos_watched, watch_time in user_stats %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ videos_watched }}</td>
+                    <td>{{ "%.2f"|format(watch_time or 0) }}s</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %} 

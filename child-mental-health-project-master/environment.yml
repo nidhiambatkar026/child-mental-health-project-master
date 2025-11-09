@@ -1,0 +1,20 @@
+name: emotion-detection
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pip>=20.0
+  - pip:
+    - opencv-python
+    - numpy
+    - tensorflow
+    - keras
+    - tensorflow
+    - flask>=2.0.0
+    - flask_login
+    - flask_migrate
+    - flask_sqlalchemy
+    - werkzeug
+    - python-dotenv>=0.19.0
+    - keras>=2.4.0 

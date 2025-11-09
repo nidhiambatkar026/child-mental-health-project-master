@@ -1,0 +1,13 @@
+opencv-python>=4.5.0
+numpy>=1.19.0
+tensorflow>=2.0.0
+keras>=2.4.0
+flask>=2.0.0
+python-dotenv>=0.19.0
+Werkzeug>=2.0.0
+Jinja2>=3.0.0 
+
+
+# conda env create -f environment.yml
+# conda activate emotion-detection
+# pip install -r requirements.txt

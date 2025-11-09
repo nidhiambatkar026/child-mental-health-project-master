@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        overflow: hidden;
+        background-color: black;
+    }
+
+    .reels-container {
+        height: 100vh;
+        overflow-y: scroll;
+        scroll-snap-type: y mandatory;
+        background-color: black;
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        &::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .reel {
+        height: 100vh;
+        width: 100%;
+        scroll-snap-align: start;
+        position: relative;
+        background-color: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .reel video {
+        height: 100vh;
+        max-width: 100%;
+        width: auto;
+        object-fit: contain;
+        position: relative;
+        z-index: 1;
+    }
+
+    /* For mobile devices in portrait mode */
+    @media (max-aspect-ratio: 1/1) {
+        .reel video {
+            width: 100%;
+            height: auto;
+            max-height: 100vh;
+        }
+    }
+
+    /* For desktop and landscape modes */
+    @media (min-aspect-ratio: 1/1) {
+        .reel video {
+            height: 100vh;
+            width: auto;
+            max-width: 100%;
+        }
+    }
+
+    .reel-overlay {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 20px;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+        color: white;
+        z-index: 2;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #666;
+        margin-right: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .actions {
+        position: absolute;
+        right: 20px;
+        bottom: 100px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        z-index: 2;
+    }
+
+    .action-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        color: white;
+        background: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .action-button i {
+        font-size: 24px;
+        margin-bottom: 5px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .count {
+        font-size: 14px;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .liked {
+        color: red;
+    }
+
+    /* Add a background overlay to make video controls more visible */
+    .video-controls-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: opacity 0.3s;
+        z-index: 1;
+    }
+
+    .reel:hover .video-controls-overlay {
+        opacity: 1;
+    }
+</style>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<div class="reels-container" id="reelsContainer">
+    {% for video in videos %}
+    <div class="reel" data-video-id="{{ video.id }}">
+        <video src="{{ url_for('static', filename='uploads/' + video.filename) }}" loop>
+            Your browser does not support the video tag.
+        </video>
+        <div class="reel-overlay">
+            <div class="user-info">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="username">{{ video.title }}</div>
+            </div>
+            <div class="description">
+                Uploaded on: {{ video.upload_date.strftime('%Y-%m-%d') }}
+            </div>
+        </div>
+        <div class="actions">
+            <button class="action-button like-button" data-video-id="{{ video.id }}">
+                <i class="fas fa-heart"></i>
+                <span class="count">{{ video.views }}</span>
+            </button>
+            <button class="action-button">
+                <i class="fas fa-comment"></i>
+                <span class="count">0</span>
+            </button>
+            <button class="action-button">
+                <i class="fas fa-share"></i>
+                <span class="count">0</span>
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+<video id="faceVideo" style="display: none" autoplay></video>
+<canvas id="faceCanvas" style="display: none"></canvas>
+
+<script>
+    class ReelsPlayer {
+        constructor(container) {
+            this.container = container;
+            this.reels = container.querySelectorAll('.reel');
+            this.currentReelIndex = 0;
+            this.viewTracking = new Map(); // Track viewing data for each video
+            this.emotionTracking = new Map();
+            this.faceDetectionReady = false;
+            this.init();
+            this.initFaceDetection();
+        }
+
+        init() {
+            this.setupVideoHandlers();
+            this.setupIntersectionObserver();
+            this.setupScrollHandler();
+            this.setupLikeButtons();
+        }
+
+        async initFaceDetection() {
+            try {
+                await faceapi.nets.tinyFaceDetector.loadFromUri('/static/models');
+                await faceapi.nets.faceExpressionNet.loadFromUri('/static/models');
+                
+                // Setup webcam
+                const faceVideo = document.getElementById('faceVideo');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                faceVideo.srcObject = stream;
+                
+                this.faceDetectionReady = true;
+                this.startEmotionTracking();
+            } catch (error) {
+                console.error('Error initializing face detection:', error);
+            }
+        }
+
+        async startEmotionTracking() {
+            if (!this.faceDetectionReady) return;
+
+            const faceVideo = document.getElementById('faceVideo');
+            const canvas = document.getElementById('faceCanvas');
+
+            setInterval(async () => {
+                try {
+                    const currentVideo = this.reels[this.currentReelIndex].querySelector('video');
+                    if (currentVideo.paused) return;
+
+                    const detections = await faceapi.detectSingleFace(
+                        faceVideo,
+                        new faceapi.TinyFaceDetectorOptions()
+                    ).withFaceExpressions();
+
+                    if (detections) {
+                        const videoId = this.reels[this.currentReelIndex].dataset.videoId;
+                        const timestamp = currentVideo.currentTime;
+                        
+                        await this.trackEmotion(videoId, timestamp, detections.expressions);
+                    }
+                } catch (error) {
+                    console.error('Error tracking emotions:', error);
+                }
+            }, 1000); // Track emotions every second
+        }
+
+        async trackEmotion(videoId, timestamp, expressions) {
+            try {
+                const response = await fetch('/track_emotion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        video_id: videoId,
+                        timestamp: timestamp,
+                        emotions: {
+                            happy: expressions.happy,
+                            sad: expressions.sad,
+                            angry: expressions.angry,
+                            surprised: expressions.surprised,
+                            neutral: expressions.neutral
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.warning) {
+                    this.showWarning(data.warning);
+                }
+            } catch (error) {
+                console.error('Error saving emotion data:', error);
+            }
+        }
+
+        showWarning(warning) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = `alert alert-${warning.level >= 3 ? 'danger' : 'warning'} warning-alert`;
+            warningDiv.style.position = 'fixed';
+            warningDiv.style.top = '20px';
+            warningDiv.style.left = '50%';
+            warningDiv.style.transform = 'translateX(-50%)';
+            warningDiv.style.zIndex = '1000';
+            warningDiv.style.padding = '15px';
+            warningDiv.style.borderRadius = '5px';
+            warningDiv.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            
+            let message = `<strong>Warning Level ${warning.level}:</strong><br>`;
+            message += warning.reasons.join('<br>');
+            if (warning.level >= 3) {
+                message += '<br><strong>Recommendation: Please take a break from watching videos.</strong>';
+            }
+            
+            warningDiv.innerHTML = message;
+            document.body.appendChild(warningDiv);
+            
+            setTimeout(() => {
+                warningDiv.remove();
+            }, 5000);
+        }
+
+        setupVideoHandlers() {
+            this.reels.forEach(reel => {
+                const video = reel.querySelector('video');
+                const videoId = reel.dataset.videoId;
+                
+                // Initialize tracking data
+                this.viewTracking.set(videoId, {
+                    startTime: 0,
+                    totalWatched: 0,
+                    lastUpdate: 0
+                });
+                
+                video.addEventListener('play', () => {
+                    const tracking = this.viewTracking.get(videoId);
+                    tracking.startTime = Date.now();
+                    tracking.lastUpdate = Date.now();
+                });
+                
+                video.addEventListener('pause', () => {
+                    this.updateWatchDuration(videoId);
+                });
+                
+                video.addEventListener('ended', () => {
+                    this.updateWatchDuration(videoId, true);
+                });
+                
+                // Track progress every second
+                setInterval(() => {
+                    if (!video.paused) {
+                        this.updateWatchDuration(videoId);
+                    }
+                }, 1000);
+            });
+        }
+
+        setupIntersectionObserver() {
+            const options = {
+                root: this.container,
+                threshold: 0.5
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target.querySelector('video');
+                    const videoId = entry.target.dataset.videoId;
+                    
+                    if (entry.isIntersecting) {
+                        video.play();
+                        this.incrementVideoView(videoId);
+                    } else {
+                        video.pause();
+                    }
+                });
+            }, options);
+
+            this.reels.forEach(reel => {
+                observer.observe(reel);
+            });
+        }
+
+        async incrementVideoView(videoId) {
+            try {
+                const response = await fetch(`/increment_view/${videoId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const viewCount = document.querySelector(`[data-video-id="${videoId}"] .count`);
+                    if (viewCount) {
+                        viewCount.textContent = data.views;
+                    }
+                }
+            } catch (error) {
+                console.error('Error incrementing view count:', error);
+            }
+        }
+
+        async updateWatchDuration(videoId, completed = false) {
+            const tracking = this.viewTracking.get(videoId);
+            const now = Date.now();
+            const duration = (now - tracking.lastUpdate) / 1000; // Convert to seconds
+            
+            tracking.totalWatched += duration;
+            tracking.lastUpdate = now;
+            
+            try {
+                const response = await fetch('/track_view', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        video_id: videoId,
+                        duration: tracking.totalWatched,
+                        completed: completed
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    const viewCount = document.querySelector(`[data-video-id="${videoId}"] .count`);
+                    if (viewCount) {
+                        viewCount.textContent = data.views;
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating view tracking:', error);
+            }
+        }
+
+        setupScrollHandler() {
+            let scrollTimeout;
+            this.container.addEventListener('scroll', () => {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    const reelHeight = this.container.clientHeight;
+                    const scrollPosition = this.container.scrollTop;
+                    this.currentReelIndex = Math.round(scrollPosition / reelHeight);
+                }, 50);
+            });
+        }
+
+        setupLikeButtons() {
+            const likeButtons = document.querySelectorAll('.like-button');
+            likeButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    button.classList.toggle('liked');
+                    const countSpan = button.querySelector('.count');
+                    let currentLikes = parseInt(countSpan.textContent);
+                    if (button.classList.contains('liked')) {
+                        countSpan.textContent = currentLikes + 1;
+                    } else {
+                        countSpan.textContent = currentLikes - 1;
+                    }
+                });
+            });
+        }
+    }
+
+    // Initialize the reels player when the document is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+        const container = document.getElementById('reelsContainer');
+        const reelsPlayer = new ReelsPlayer(container);
+    });
+</script>
+{% endblock %} 
